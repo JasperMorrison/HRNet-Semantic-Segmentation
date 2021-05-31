@@ -11,6 +11,9 @@ import numpy as np
 
 import torch
 from torch.nn import functional as F
+from PIL import Image
+from PIL import ImageFont
+from PIL import ImageDraw
 
 from .base_dataset import BaseDataset
  
@@ -34,6 +37,29 @@ class LIP(BaseDataset):
         super(LIP, self).__init__(ignore_label, base_size,
                 crop_size, downsample_rate, scale_factor, mean, std)
 
+        self.labels = {
+            0:"BG",
+            1:"Hat",
+            2:"Hair",
+            3:"Glove",
+            4:"Sunglasses",
+            5:"UpperClothes",
+            6:"Dress",
+            7:"Coat",
+            8:"Socks",
+            9:"Pants",
+            10:"Jumpsuits",
+            11:"Scarf",
+            12:"Skirt",
+            13:"Face",
+            14:"Left-arm",
+            15:"Right-arm",
+            16:"Left-leg",
+            17:"Right-leg",
+            18:"Left-shoe",
+            19:"Right-shoe"
+        }
+
         self.root = root
         self.num_classes = num_classes
         self.list_path = list_path
@@ -46,7 +72,28 @@ class LIP(BaseDataset):
         self.files = self.read_files()
         if num_samples:
             self.files = self.files[:num_samples]
-    
+
+        self.palette = self.get_palette(256)
+        per_palette = 50
+        # save the palette for test
+        '''
+        palette = np.array(self.palette[0:3*self.num_classes]).reshape(-1,3)
+        palette_img = np.zeros((self.num_classes * per_palette,100,3),np.uint8)
+        for i in range(0,self.num_classes):
+            palette_img[per_palette*i:per_palette*(i+1),:] = palette[i]
+            cv2.putText(palette_img, str(i), (0,per_palette*(i+1)-5), cv2.FONT_HERSHEY_COMPLEX,1,(255,255,255),1)
+        cv2.imwrite("palette.jpg", palette_img)
+        '''
+        palette_img = np.zeros((self.num_classes * per_palette,100),np.uint8)
+        for i in range(0,self.num_classes):
+            palette_img[per_palette*i:per_palette*(i+1),:] = i
+        save_img = Image.fromarray(palette_img)
+        save_img.putpalette(self.palette)
+        draw = ImageDraw.Draw(save_img)
+        for i in range(0,self.num_classes):
+            draw.text((0,per_palette*(i+1)-20), self.labels[i])
+        save_img.save("palette.png")
+
     def read_files(self):
         files = []
         for item in self.img_list:
@@ -128,4 +175,28 @@ class LIP(BaseDataset):
             pred += flip_pred
             pred = pred * 0.5
         return pred.exp()
-    
+
+    def get_palette(self, n):
+        palette = [0] * (n * 3)
+        for j in range(0, n):
+            lab = j
+            palette[j * 3 + 0] = 0
+            palette[j * 3 + 1] = 0
+            palette[j * 3 + 2] = 0
+            i = 0
+            while lab:
+                palette[j * 3 + 0] |= (((lab >> 0) & 1) << (7 - i))
+                palette[j * 3 + 1] |= (((lab >> 1) & 1) << (7 - i))
+                palette[j * 3 + 2] |= (((lab >> 2) & 1) << (7 - i))
+                i += 1
+                lab >>= 3
+        return palette
+
+    def save_pred(self, preds, sv_path, name):
+        preds = preds.cpu().numpy().copy()
+        preds = np.asarray(np.argmax(preds, axis=1), dtype=np.uint8)
+        for i in range(preds.shape[0]):
+            pred = preds[i]
+            save_img = Image.fromarray(pred)
+            save_img.putpalette(self.palette)
+            save_img.save(os.path.join(sv_path, name[i]+'.png'))

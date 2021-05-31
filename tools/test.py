@@ -110,9 +110,17 @@ def main():
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True)
-    
+    print("=======final_output_dir", final_output_dir)
     start = timeit.default_timer()
-    if 'val' in config.DATASET.TEST_SET:
+    if 'test' in config.DATASET.TEST_SET:
+        print("=======test")
+        test(config, 
+             test_dataset, 
+             testloader, 
+             model,
+             sv_dir=final_output_dir)
+    elif 'val' in config.DATASET.TEST_SET:
+        print("=======val")
         mean_IoU, IoU_array, pixel_acc, mean_acc = testval(config, 
                                                            test_dataset, 
                                                            testloader, 
@@ -123,12 +131,6 @@ def main():
             pixel_acc, mean_acc)
         logging.info(msg)
         logging.info(IoU_array)
-    elif 'test' in config.DATASET.TEST_SET:
-        test(config, 
-             test_dataset, 
-             testloader, 
-             model,
-             sv_dir=final_output_dir)
 
     end = timeit.default_timer()
     logger.info('Mins: %d' % np.int((end-start)/60))
